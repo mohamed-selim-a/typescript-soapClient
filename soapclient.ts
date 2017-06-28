@@ -10,6 +10,7 @@
 \*****************************************************************************/
 
 declare var XMLHttpRequest: any;
+declare var ActiveXObject: any;
 
 export class SOAPClientParameters {
 	_pl = new Array();
@@ -37,6 +38,9 @@ export class SOAPClientParameters {
 	}
 
 	public static _serialize(o: any): string {
+		if(o != 0 && !o){
+			return "";
+		}
 		var s: string = "";
 		switch (typeof (o)) {
 			case "string":
@@ -109,7 +113,7 @@ export class SOAPClient {
 	public static userName = null;
 	public static password = null;
 
-	public static invoke(url: string, method: string, parameters: SOAPClientParameters, async: boolean, callback: (data: any) => void): any {
+	public static invoke(url: string, method: string, parameters: SOAPClientParameters, async: boolean, callback: (data: any, resXml: any) => void): any {
 		if (async)
 			SOAPClient._loadWsdl(url, method, parameters, async, callback);
 		else
@@ -120,7 +124,7 @@ export class SOAPClient {
 	private static SOAPClient_cacheWsdl = new Array();
 
 	// private: invoke async
-	private static _loadWsdl(url: string, method: string, parameters: SOAPClientParameters, async: boolean, callback: (data: any) => void): void {
+	private static _loadWsdl(url: string, method: string, parameters: SOAPClientParameters, async: boolean, callback: (data: any, resXml: any) => void): void {
 		// load from cache?
 		var wsdl = SOAPClient.SOAPClient_cacheWsdl[url];
 
@@ -185,21 +189,24 @@ export class SOAPClient {
 
 	private static _onSendSoapRequest(method, async, callback, wsdl, req) {
 		var o = null;
-		var nd = SOAPClient._getElementsByTagName(req.responseXML, method + "Result");
-		if (nd.length == 0)
-			nd = SOAPClient._getElementsByTagName(req.responseXML, "return");
+		// var nd = SOAPClient._getElementsByTagName(req.responseXML, method + "Response");
+		// if (nd.length == 0)
+		var nd = SOAPClient._getElementsByTagName(req.responseXML, "return");
 		if (nd.length == 0) {
 			if (req.responseXML.getElementsByTagName("faultcode").length > 0) {
 				if (async || callback)
-					o = new Error(req.responseXML.getElementsByTagName("faultstring")[0].childNodes[0].nodeValue);
+					o = { message:req.responseXML.getElementsByTagName("faultstring")[0].nodeValue};
 				else
-					throw new Error(req.responseXML.getElementsByTagName("faultstring")[0].childNodes[0].nodeValue);
+					throw new Error(req.responseXML.getElementsByTagName("faultstring")[0].nodeValue);
+			}
+			else{ //no return and no fault - empty result
+				o= {};
 			}
 		}
 		else if (nd.length == 1) {
 			o = SOAPClient._soapresult2object(nd[0], wsdl);
 		}
-		else { //the weblogic server returns an array as each valur inside a <return> element not, an array inside on return element
+		else { //the weblogic server returns an array as each value inside a <return> element not, an array inside inside one return element
 			o = [];
 			for (var i = 0; i < nd.length; i++) {
 				o.push(SOAPClient._soapresult2object(nd[i], wsdl));
@@ -210,6 +217,7 @@ export class SOAPClient {
 		if (!async)
 			return o;
 	}
+
 	private static _soapresult2object(node, wsdl) {
 		var wsdlTypes = SOAPClient._getTypesFromWsdl(wsdl);
 		return SOAPClient._node2object(node, wsdlTypes);
