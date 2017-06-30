@@ -2,7 +2,7 @@
 
  Typescript "SOAP Client" library
  
- @author: Mohamed Selim
+ @author: Mohamed Selim (2017)
 
   based on code of Javascript "SOAP Client" library by Matteo Casati - http://www.guru4.net/
   version: 2.4 - 2007.12.21
@@ -145,9 +145,15 @@ export class SOAPClient {
 	}
 
 	private static _onLoadWsdl(url, method, parameters, async, callback, req) {
-		var wsdl = req.responseXML;
-		SOAPClient.SOAPClient_cacheWsdl[url] = wsdl;	// save a copy in cache
-		return SOAPClient._sendSoapRequest(url, method, parameters, async, callback, wsdl);
+		try {
+			var wsdl = req.responseXML;
+			SOAPClient.SOAPClient_cacheWsdl[url] = wsdl;	// save a copy in cache
+			return SOAPClient._sendSoapRequest(url, method, parameters, async, callback, wsdl);
+		}
+		catch (e) {
+			SOAPClient.SOAPClient_cacheWsdl[url]= undefined;
+			callback(new Error(e.message));
+		}
 	}
 
 	private static _sendSoapRequest(url, method, parameters, async, callback, wsdl) {
@@ -195,9 +201,9 @@ export class SOAPClient {
 		if (nd.length == 0) {
 			if (req.responseXML.getElementsByTagName("faultcode").length > 0) {
 				if (async || callback)
-					o = { message:req.responseXML.getElementsByTagName("faultstring")[0].nodeValue};
+					o = new Error(req.responseXML.getElementsByTagName("faultstring")[0].textContent);
 				else
-					throw new Error(req.responseXML.getElementsByTagName("faultstring")[0].nodeValue);
+					throw new Error(req.responseXML.getElementsByTagName("faultstring")[0].textContent);
 			}
 			else{ //no return and no fault - empty result
 				o= {};
